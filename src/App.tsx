@@ -16,6 +16,9 @@ interface Parcela {
   vertices: [number, number][] // [lat, lng]
   areaHa: number
   estado: Estado
+  fuente: 'offline' | 'whisp' // cómo se determinó el estado
+  detalle?: string // texto del veredicto de Whisp
+  verificando?: boolean
   layer?: L.Polygon
 }
 
@@ -75,6 +78,13 @@ const COLORES: Record<Estado, string> = {
   alerta: '#e9b44c',
   riesgo: '#d64545',
 }
+
+// Versión del dataset Hansen Global Forest Change para los tiles reales de GFW.
+// Si la capa no carga, sube el número (v1.11 = datos hasta 2023, v1.12 = 2024, etc.).
+const GFC_VERSION = 'gfc_v1.11'
+
+// URL del backend que consulta Whisp (motor EUDR de la FAO). Ver carpeta server/.
+const WHISP_API = import.meta.env.VITE_WHISP_API ?? 'http://localhost:8787'
 
 // --- Geometría ---------------------------------------------------
 
@@ -169,8 +179,68 @@ function App() {
     layer.bindPopup(
       `<b>${id}</b> · ${socio}<br/>${areaHa.toFixed(2)} ha · <b style="color:${COLORES[estado]}">${estado}</b>`,
     )
-    setParcelas((prev) => [...prev, { id, socio, vertices, areaHa, estado, layer }])
+    setParcelas((prev) => [...prev, { id, socio, vertices, areaHa, estado, fuente: 'offline', layer }])
   }, [])
+
+  // Actualiza el color del polígono en el mapa según su estado
+  const pintarLayer = (p: Parcela, estado: Estado) => {
+    p.layer?.setStyle({ color: COLORES[estado], fillColor: COLORES[estado] })
+  }
+
+  // Nivel 2: envía la parcela al backend, que consulta Whisp (motor EUDR de la FAO)
+  const verificarConWhisp = async (parcela: Parcela) => {
+    setParcelas((prev) =>
+      prev.map((p) => (p.id === parcela.id ? { ...p, verificando: true } : p)),
+    )
+    try {
+      const geojson = {
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            properties: { id: parcela.id, socio: parcela.socio },
+            geometry: {
+              type: 'Polygon',
+              coordinates: [
+                [...parcela.vertices, parcela.vertices[0]].map(([lat, lng]) => [
+                  Number(lng.toFixed(6)),
+                  Number(lat.toFixed(6)),
+                ]),
+              ],
+            },
+          },
+        ],
+      }
+      const resp = await fetch(`${WHISP_API}/verificar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(geojson),
+      })
+      if (!resp.ok) throw new Error(`El servidor respondió ${resp.status}`)
+      const data: { estado: Estado; detalle?: string } = await resp.json()
+      setParcelas((prev) =>
+        prev.map((p) => {
+          if (p.id !== parcela.id) return p
+          pintarLayer(p, data.estado)
+          return { ...p, estado: data.estado, fuente: 'whisp', detalle: data.detalle, verificando: false }
+        }),
+      )
+    } catch (err) {
+      setParcelas((prev) =>
+        prev.map((p) => (p.id === parcela.id ? { ...p, verificando: false } : p)),
+      )
+      window.alert(
+        'No se pudo conectar con Whisp. ¿Está corriendo el servidor (carpeta server/) y configuraste tu clave? ' +
+          `Detalle: ${(err as Error).message}`,
+      )
+    }
+  }
+
+  const verificarTodas = async () => {
+    for (const p of parcelas) {
+      await verificarConWhisp(p)
+    }
+  }
 
   // Inicializa el mapa una sola vez
   useEffect(() => {
@@ -184,18 +254,43 @@ function App() {
       { attribution: 'Imágenes © Esri, Maxar, Earthstar Geographics', maxZoom: 19 },
     ).addTo(map)
 
-    // Zonas de deforestación (demo)
-    ZONAS_DEFORESTADAS.forEach((zona) => {
-      L.polygon(zona, {
-        color: '#d64545',
-        weight: 2,
-        fillColor: '#d64545',
-        fillOpacity: 0.35,
-        dashArray: '6 4',
-      })
-        .addTo(map)
-        .bindTooltip('Deforestación posterior a 31/12/2020 (demo)', { sticky: true })
-    })
+    // --- CAPA REAL: pérdida de bosque de Global Forest Watch / Hansen (UMD) ---
+    // Píxeles rojos = pérdida de cobertura arbórea detectada por satélite.
+    // Fuente pública (Hansen Global Forest Change), no requiere clave.
+    const perdidaBosqueReal = L.tileLayer(
+      `https://storage.googleapis.com/earthenginepartners-hansen/tiles/${GFC_VERSION}/loss_alpha/{z}/{x}/{y}.png`,
+      {
+        attribution: 'Pérdida de bosque: Hansen/UMD/Google/USGS/NASA (Global Forest Watch)',
+        maxNativeZoom: 12, // los tiles existen hasta z12; Leaflet los amplía para zooms mayores
+        maxZoom: 19,
+        opacity: 0.8,
+      },
+    ).addTo(map)
+
+    // Zonas de deforestación de referencia (demo, para el semáforo offline)
+    const zonasDemo = L.layerGroup(
+      ZONAS_DEFORESTADAS.map((zona) =>
+        L.polygon(zona, {
+          color: '#d64545',
+          weight: 2,
+          fillColor: '#d64545',
+          fillOpacity: 0.35,
+          dashArray: '6 4',
+        }).bindTooltip('Zona de referencia para el semáforo offline (demo)', { sticky: true }),
+      ),
+    ).addTo(map)
+
+    // Control para prender/apagar cada capa
+    L.control
+      .layers(
+        undefined,
+        {
+          'Pérdida de bosque real (GFW)': perdidaBosqueReal,
+          'Zonas de referencia (demo offline)': zonasDemo,
+        },
+        { collapsed: false, position: 'topright' },
+      )
+      .addTo(map)
 
     map.on('click', (e: L.LeafletMouseEvent) => {
       if (!dibujandoRef.current) return
@@ -340,6 +435,15 @@ function App() {
             <button className="btn" onClick={exportarGeoJSON} disabled={parcelas.length === 0}>
               Exportar GeoJSON (EUDR)
             </button>
+            <button
+              className="btn whisp"
+              onClick={verificarTodas}
+              disabled={parcelas.length === 0 || parcelas.some((p) => p.verificando)}
+            >
+              {parcelas.some((p) => p.verificando)
+                ? 'Consultando Whisp…'
+                : 'Verificar con Whisp (online)'}
+            </button>
           </div>
 
           <h2>Parcelas ({parcelas.length})</h2>
@@ -351,6 +455,9 @@ function App() {
                   <strong>{p.id}</strong> · {p.socio}
                   <small>
                     {p.areaHa.toFixed(2)} ha · {p.estado}
+                    <span className={`fuente ${p.fuente}`}>
+                      {p.verificando ? '⏳ Whisp…' : p.fuente === 'whisp' ? '✓ Whisp' : 'offline'}
+                    </span>
                   </small>
                 </div>
               </li>

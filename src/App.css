@@ -130,6 +130,28 @@ body,
   font-weight: 600;
 }
 
+.btn.whisp {
+  background: var(--cielo);
+  border-color: #0b8794;
+  color: #fff;
+  font-weight: 600;
+}
+
+.fuente {
+  margin-left: 6px;
+  font-size: 0.66rem;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--borde);
+  color: #5b6b66;
+}
+
+.fuente.whisp {
+  color: #0b8794;
+  border-color: var(--cielo);
+  font-weight: 600;
+}
+
 .ayuda {
   margin: 0;
   font-size: 0.8rem;
