@@ -25,7 +25,8 @@ const WHISP_BASE = process.env.WHISP_BASE_URL || 'https://whisp.openforis.org/ap
 // Versión del dataset Hansen Global Forest Change (mismos tiles que muestra el mapa)
 const GFC_VERSION = process.env.GFC_VERSION || 'gfc_v1.11'
 const Z = 12 // nivel de zoom de los tiles Hansen (máximo nativo)
-const BUFFER_PX = 12 // margen (en píxeles) para marcar "alerta" por cercanía
+const BUFFER_PX = 4 // margen (en píxeles) para marcar "alerta" por cercanía
+const RIESGO_HA = 0.5 // pérdida mínima dentro de la parcela para marcar "riesgo"
 
 const dormir = (ms) => new Promise((r) => setTimeout(r, ms))
 
@@ -123,18 +124,28 @@ export async function analizarHansen(anillo) {
     throw new Error('No se pudieron leer los tiles de Hansen (¿versión GFC_VERSION correcta?)')
   }
 
-  if (dentro > 0) {
+  // Área aproximada de cada píxel a este zoom y latitud (en hectáreas)
+  const latC = anillo.reduce((s, c) => s + c[1], 0) / anillo.length
+  const mppx = (156543.03392 * Math.cos((latC * Math.PI) / 180)) / Math.pow(2, Z)
+  const haPorPixel = (mppx * mppx) / 10000
+  const perdidaHa = dentro * haPorPixel
+
+  // Clasificación con umbral: un píxel histórico aislado no condena la parcela.
+  if (perdidaHa >= RIESGO_HA) {
     return {
       estado: 'riesgo',
       fuente: 'gfw',
-      detalle: `Hansen/GFW: ${dentro} píxel(es) de pérdida de bosque dentro de la parcela.`,
+      detalle: `Hansen/GFW: ~${perdidaHa.toFixed(2)} ha de pérdida de bosque dentro de la parcela.`,
     }
   }
-  if (cerca > 0) {
+  if (dentro > 0 || cerca > 0) {
     return {
       estado: 'alerta',
       fuente: 'gfw',
-      detalle: `Hansen/GFW: pérdida de bosque a menos de ~${BUFFER_PX} px del borde (${cerca} píxel(es)).`,
+      detalle:
+        dentro > 0
+          ? `Hansen/GFW: pérdida menor dentro de la parcela (~${perdidaHa.toFixed(2)} ha); revisar.`
+          : `Hansen/GFW: pérdida de bosque cerca del borde.`,
     }
   }
   return {
@@ -205,10 +216,7 @@ app.get('/', (_req, res) =>
   res.json({ ok: true, motor: WHISP_API_KEY ? 'whisp' : 'hansen-gfw', version: GFC_VERSION }),
 )
 
-// Arranca el servidor solo si se ejecuta directamente (no al importarlo en tests)
-if (import.meta.url === `file://${process.argv[1]}`) {
-  app.listen(PORT, () => {
-    console.log(`Waylla server en http://localhost:${PORT}`)
-    console.log(`Motor: ${WHISP_API_KEY ? 'Whisp (FAO)' : `Hansen/GFW real, ${GFC_VERSION}`}`)
-  })
-}
+app.listen(PORT, () => {
+  console.log(`Waylla server en http://localhost:${PORT}`)
+  console.log(`Motor: ${WHISP_API_KEY ? 'Whisp (FAO)' : `Hansen/GFW real, ${GFC_VERSION}`}`)
+})

@@ -2,6 +2,9 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import './App.css'
+import Landing from './Landing'
+import Ubicacion, { type Ubic } from './Ubicacion'
+import Logo from './Logo'
 
 // ---------------------------------------------------------------
 // Waylla - Prototipo de trazabilidad EUDR para café y cacao
@@ -159,7 +162,7 @@ function evaluarEstado(vertices: [number, number][]): Estado {
 
 // --- Componente principal ---------------------------------------
 
-function App() {
+function MapaApp({ ubic, onInicio }: { ubic: Ubic; onInicio: () => void }) {
   const mapRef = useRef<L.Map | null>(null)
   const mapDivRef = useRef<HTMLDivElement | null>(null)
   const dibujoRef = useRef<{
@@ -260,7 +263,7 @@ function App() {
   // Inicializa el mapa una sola vez
   useEffect(() => {
     if (mapRef.current || !mapDivRef.current) return
-    const map = L.map(mapDivRef.current, { center: [-5.696, -78.795], zoom: 14 })
+    const map = L.map(mapDivRef.current, { center: ubic.center, zoom: ubic.zoom })
     mapRef.current = map
 
     // Imagen satelital (Esri World Imagery, uso libre con atribución)
@@ -322,8 +325,8 @@ function App() {
       setNVertices(d.puntos.length)
     })
 
-    // Carga las parcelas de ejemplo
-    PARCELAS_EJEMPLO.forEach((p) => agregarParcela(p.socio, p.vertices))
+    // Carga las parcelas de ejemplo solo en la zona demo
+    if (ubic.conEjemplos) PARCELAS_EJEMPLO.forEach((p) => agregarParcela(p.socio, p.vertices))
 
     return () => {
       // Limpieza (importante en dev: StrictMode monta el efecto dos veces)
@@ -332,7 +335,7 @@ function App() {
       setParcelas([])
       contadorRef.current = 1
     }
-  }, [agregarParcela])
+  }, [agregarParcela, ubic])
 
   const limpiarDibujo = () => {
     const d = dibujoRef.current
@@ -414,11 +417,16 @@ function App() {
   return (
     <div className="app">
       <header className="cabecera">
-        <div>
-          <h1>Waylla</h1>
-          <span className="subtitulo">
-            Trazabilidad libre de deforestación · Coop. Valle Alto (demo)
-          </span>
+        <div className="cab-izq">
+          <button className="btn-inicio" onClick={onInicio} title="Volver al inicio">
+            ← Inicio
+          </button>
+          <div>
+            <h1><Logo size={24} /> Waylla</h1>
+            <span className="subtitulo">
+              Trazabilidad libre de deforestación · {ubic.nombre}
+            </span>
+          </div>
         </div>
         <div className="resumen">
           <span className="chip limpia">{resumen.limpia} limpias</span>
@@ -489,6 +497,34 @@ function App() {
         <div ref={mapDivRef} className="mapa" />
       </div>
     </div>
+  )
+}
+
+// --- Contenedor: muestra la portada o el mapa -------------------
+
+function App() {
+  const [vista, setVista] = useState<'inicio' | 'ubicacion' | 'mapa'>('inicio')
+  const [ubic, setUbic] = useState<Ubic | null>(null)
+
+  if (vista === 'inicio') return <Landing onComenzar={() => setVista('ubicacion')} />
+  if (vista === 'ubicacion' || !ubic)
+    return (
+      <Ubicacion
+        onElegir={(u) => {
+          setUbic(u)
+          setVista('mapa')
+        }}
+        onVolver={() => setVista('inicio')}
+      />
+    )
+  return (
+    <MapaApp
+      ubic={ubic}
+      onInicio={() => {
+        setUbic(null)
+        setVista('inicio')
+      }}
+    />
   )
 }
 
