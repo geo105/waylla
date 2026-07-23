@@ -10,16 +10,25 @@ import './App.css'
 
 type Estado = 'limpia' | 'alerta' | 'riesgo'
 
+type Fuente = 'offline' | 'gfw' | 'whisp'
+
 interface Parcela {
   id: string
   socio: string
   vertices: [number, number][] // [lat, lng]
   areaHa: number
   estado: Estado
-  fuente: 'offline' | 'whisp' // cómo se determinó el estado
-  detalle?: string // texto del veredicto de Whisp
+  fuente: Fuente // cómo se determinó el estado
+  detalle?: string // texto del veredicto del análisis online
   verificando?: boolean
   layer?: L.Polygon
+}
+
+// Etiqueta corta para el badge de cada parcela
+const ETIQUETA_FUENTE: Record<Fuente, string> = {
+  offline: 'offline',
+  gfw: '✓ GFW',
+  whisp: '✓ Whisp',
 }
 
 // Zonas de deforestación post-2020 (DEMO - en producción vienen de
@@ -217,12 +226,18 @@ function App() {
         body: JSON.stringify(geojson),
       })
       if (!resp.ok) throw new Error(`El servidor respondió ${resp.status}`)
-      const data: { estado: Estado; detalle?: string } = await resp.json()
+      const data: { estado: Estado; detalle?: string; fuente?: Fuente } = await resp.json()
       setParcelas((prev) =>
         prev.map((p) => {
           if (p.id !== parcela.id) return p
           pintarLayer(p, data.estado)
-          return { ...p, estado: data.estado, fuente: 'whisp', detalle: data.detalle, verificando: false }
+          return {
+            ...p,
+            estado: data.estado,
+            fuente: data.fuente ?? 'gfw',
+            detalle: data.detalle,
+            verificando: false,
+          }
         }),
       )
     } catch (err) {
@@ -230,7 +245,7 @@ function App() {
         prev.map((p) => (p.id === parcela.id ? { ...p, verificando: false } : p)),
       )
       window.alert(
-        'No se pudo conectar con Whisp. ¿Está corriendo el servidor (carpeta server/) y configuraste tu clave? ' +
+        'No se pudo verificar. ¿Está corriendo el servidor (carpeta server/, con "npm start")? ' +
           `Detalle: ${(err as Error).message}`,
       )
     }
@@ -441,8 +456,8 @@ function App() {
               disabled={parcelas.length === 0 || parcelas.some((p) => p.verificando)}
             >
               {parcelas.some((p) => p.verificando)
-                ? 'Consultando Whisp…'
-                : 'Verificar con Whisp (online)'}
+                ? 'Analizando satélite…'
+                : 'Verificar deforestación (online)'}
             </button>
           </div>
 
@@ -456,7 +471,7 @@ function App() {
                   <small>
                     {p.areaHa.toFixed(2)} ha · {p.estado}
                     <span className={`fuente ${p.fuente}`}>
-                      {p.verificando ? '⏳ Whisp…' : p.fuente === 'whisp' ? '✓ Whisp' : 'offline'}
+                      {p.verificando ? '⏳…' : ETIQUETA_FUENTE[p.fuente]}
                     </span>
                   </small>
                 </div>

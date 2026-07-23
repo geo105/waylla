@@ -12,10 +12,11 @@ calidad y verificación.
 - Permite **delimitar parcelas** haciendo clic en los vértices del perímetro (simula al técnico
   caminando la parcela), calcula el **área en hectáreas** y les asigna un **semáforo de riesgo**.
 - Tiene **dos modos de verificación**:
-  - **Offline** (sin internet): semáforo geométrico rápido, cruzando la parcela con zonas de
-    referencia. Pensado para el técnico en campo sin señal.
-  - **Online** (botón *Verificar con Whisp*): envía la parcela al motor **Whisp** de la FAO
-    (Open Foris), la herramienta oficial de análisis EUDR, y trae el veredicto real.
+  - **Offline** (sin internet): semáforo geométrico rápido. Pensado para el técnico en campo sin señal.
+  - **Online** (botón *Verificar deforestación*): el servidor lee los **píxeles reales de
+    pérdida de bosque de Global Forest Watch** que caen dentro de la parcela y devuelve el
+    veredicto (riesgo / alerta / limpia). Sin clave ni registro. Opcionalmente puede usar el
+    motor **Whisp** de la FAO si configuras una clave.
 - Exporta las parcelas como **GeoJSON con 6 decimales de precisión**, el formato que exige
   el reglamento europeo EUDR (UE 2023/1115).
 
@@ -36,9 +37,8 @@ npm install
 npm start
 ```
 
-Sin clave de Whisp, el servidor funciona en **modo simulado** (útil para probar el flujo).
-Para el análisis real, regístrate gratis en <https://whisp.openforis.org> y sigue las
-instrucciones de `server/README.md`.
+El servidor analiza deforestación real de Global Forest Watch sin necesidad de clave.
+Ver `server/README.md` para detalles y para activar el motor Whisp (FAO) opcional.
 
 ## Stack
 

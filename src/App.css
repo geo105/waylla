@@ -146,7 +146,8 @@ body,
   color: #5b6b66;
 }
 
-.fuente.whisp {
+.fuente.whisp,
+.fuente.gfw {
   color: #0b8794;
   border-color: var(--cielo);
   font-weight: 600;
