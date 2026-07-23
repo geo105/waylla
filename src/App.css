@@ -1,0 +1,209 @@
+/* Waylla - estilos del prototipo */
+
+:root {
+  --verde: #1b7a43;
+  --verde-oscuro: #0e4d2b;
+  --cielo: #0fa3b1;
+  --tinta: #22333b;
+  --gris: #f2f4f3;
+  --borde: #dde3e0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  color: var(--tinta);
+}
+
+/* --- Cabecera --- */
+.cabecera {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 18px;
+  background: var(--verde-oscuro);
+  color: #fff;
+}
+
+.cabecera h1 {
+  margin: 0;
+  font-size: 1.35rem;
+  letter-spacing: 0.5px;
+}
+
+.subtitulo {
+  font-size: 0.8rem;
+  opacity: 0.85;
+}
+
+.resumen {
+  display: flex;
+  gap: 8px;
+}
+
+.chip {
+  font-size: 0.78rem;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.chip.limpia {
+  border-color: #2eae60;
+}
+
+.chip.alerta {
+  border-color: #e9b44c;
+}
+
+.chip.riesgo {
+  border-color: #d64545;
+}
+
+/* --- Layout --- */
+.contenido {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.panel {
+  width: 300px;
+  padding: 14px;
+  background: #fff;
+  border-right: 1px solid var(--borde);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+}
+
+.mapa {
+  flex: 1;
+}
+
+/* --- Acciones --- */
+.acciones {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.btn {
+  padding: 9px 12px;
+  border: 1px solid var(--borde);
+  border-radius: 8px;
+  background: var(--gris);
+  color: var(--tinta);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: filter 0.15s;
+}
+
+.btn:hover {
+  filter: brightness(0.95);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.btn.principal {
+  background: var(--verde);
+  border-color: var(--verde-oscuro);
+  color: #fff;
+  font-weight: 600;
+}
+
+.ayuda {
+  margin: 0;
+  font-size: 0.8rem;
+  background: #eaf7f8;
+  border: 1px solid var(--cielo);
+  border-radius: 8px;
+  padding: 8px;
+}
+
+/* --- Lista de parcelas --- */
+.panel h2 {
+  margin: 6px 0 0;
+  font-size: 1rem;
+}
+
+.lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lista li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--borde);
+  border-radius: 8px;
+  cursor: pointer;
+  background: #fff;
+}
+
+.lista li:hover {
+  background: var(--gris);
+}
+
+.punto {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.lista strong {
+  font-size: 0.88rem;
+}
+
+.lista small {
+  display: block;
+  color: #5b6b66;
+  font-size: 0.76rem;
+}
+
+.nota {
+  margin-top: auto;
+  font-size: 0.72rem;
+  color: #5b6b66;
+  border-top: 1px solid var(--borde);
+  padding-top: 8px;
+}
+
+/* --- Responsive --- */
+@media (max-width: 700px) {
+  .contenido {
+    flex-direction: column-reverse;
+  }
+
+  .panel {
+    width: 100%;
+    max-height: 45%;
+    border-right: none;
+    border-top: 1px solid var(--borde);
+  }
+}
