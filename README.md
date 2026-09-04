@@ -46,4 +46,4 @@ Vite + React 19 + TypeScript + Leaflet (frontend) · Express (servidor puente a 
 
 ## Equipo
 
-Proyecto del equipo [NOMBRE DEL EQUIPO] para la Disruptón 2026 — UTEC.
+Proyecto del equipo GeoTrace Lab para la Disruptón 2026 — UTEC.
