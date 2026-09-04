@@ -1,0 +1,326 @@
+/* ---------------------------------------------------------------
+   Estilos de las pantallas nuevas (lotes, expediente, ruta, vitrina).
+   Van en un archivo aparte para no tocar App.css ni Landing.css, que
+   ya tienen los cambios del equipo. Importar una sola vez, por ejemplo
+   al inicio de App.tsx:  import './Extras.css'
+   --------------------------------------------------------------- */
+
+/* --- Pestañas de la cabecera (Parcelas / Lotes) --- */
+.pestanas {
+  display: flex;
+  gap: 6px;
+}
+
+.pestanas button {
+  position: relative;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #d7e8dd;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 8px;
+  padding: 7px 14px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.pestanas button:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
+.pestanas button:focus-visible { outline: 2px solid #bff0c8; outline-offset: 2px; }
+
+.pestanas button.activa {
+  background: #fff;
+  color: var(--verde-oscuro);
+  border-color: #fff;
+}
+
+.pestanas .cuenta {
+  font-size: 0.74rem;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.pestanas button.activa .cuenta {
+  background: var(--gris, #eef1f0);
+  color: var(--verde-oscuro);
+}
+
+.pestanas .alerta-punto {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ff6b5e;
+}
+
+/* --- Vistas con desplazamiento (lotes y expediente) --- */
+.vista-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--gris, #f2f4f3);
+}
+
+.coop-barra {
+  background: #fff;
+  border-bottom: 1px solid var(--borde);
+  padding: 12px 30px;
+}
+
+.coop-barra label {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #4a5a55;
+}
+
+.coop-barra input {
+  font: inherit;
+  font-weight: 400;
+  padding: 7px 11px;
+  border: 1px solid #cfd8d4;
+  border-radius: 8px;
+  min-width: 260px;
+}
+
+.coop-barra input:focus-visible {
+  outline: 2px solid var(--verde);
+  outline-offset: 1px;
+}
+
+/* --- Avisos dentro del panel (reemplazan a los alert del navegador) --- */
+.mensaje {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 9px;
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.mensaje.info { background: #e2f0e6; color: #14603a; }
+.mensaje.error { background: #fae7e4; color: #8f2419; }
+
+.mensaje button {
+  margin-left: auto;
+  background: none;
+  border: none;
+  font-size: 1.15rem;
+  line-height: 1;
+  cursor: pointer;
+  color: inherit;
+  opacity: 0.7;
+  padding: 0 2px;
+}
+
+.mensaje button:hover { opacity: 1; }
+
+/* --- Formulario del socio al cerrar el polígono --- */
+.form-parcela {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 12px;
+  background: var(--gris, #f2f4f3);
+  border: 1px solid var(--borde);
+  border-radius: 10px;
+}
+
+.form-parcela label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #4a5a55;
+}
+
+.form-parcela input {
+  font: inherit;
+  font-weight: 400;
+  padding: 8px 10px;
+  border: 1px solid #cfd8d4;
+  border-radius: 7px;
+}
+
+.form-parcela input:focus-visible {
+  outline: 2px solid var(--verde);
+  outline-offset: 1px;
+}
+
+/* --- Fila de parcela con botón de borrado --- */
+.lista li { padding: 0; cursor: default; }
+
+.lista .li-cuerpo {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 4px 8px 10px;
+  background: none;
+  border: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.lista .li-borrar {
+  background: none;
+  border: none;
+  color: #9aa8a3;
+  font-size: 1.2rem;
+  line-height: 1;
+  padding: 6px 10px;
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.lista .li-borrar:hover { color: #a32b22; background: #fae7e4; }
+.lista .li-cuerpo:focus-visible,
+.lista .li-borrar:focus-visible { outline: 2px solid var(--verde); outline-offset: -2px; }
+
+@media (max-width: 860px) {
+  .cabecera { flex-wrap: wrap; gap: 10px; }
+  .pestanas { order: 3; width: 100%; }
+  .coop-barra { padding: 12px 16px; }
+  .coop-barra input { min-width: 0; width: 100%; }
+  .coop-barra label { width: 100%; }
+}
+
+/* --- Barra de navegación flotante y contenedor de las pantallas nuevas --- */
+
+.pantalla-extra {
+  min-height: 100vh;
+  background: #f2f4f3;
+  padding-bottom: 92px;
+  overflow-y: auto;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+.nav-flotante {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  z-index: 1200;
+  display: flex;
+  gap: 4px;
+  padding: 5px;
+  background: rgba(14, 77, 43, 0.96);
+  border-radius: 999px;
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.55);
+  max-width: calc(100vw - 24px);
+  overflow-x: auto;
+}
+
+.nav-flotante button {
+  position: relative;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 600;
+  white-space: nowrap;
+  color: #d7e8dd;
+  background: transparent;
+  border: none;
+  border-radius: 999px;
+  padding: 9px 16px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.nav-flotante button:hover { background: rgba(255, 255, 255, 0.12); color: #fff; }
+.nav-flotante button:focus-visible { outline: 2px solid #bff0c8; outline-offset: 2px; }
+.nav-flotante button.activa { background: #fff; color: #0e4d2b; }
+
+.nav-flotante .cuenta {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.nav-flotante button.activa .cuenta { background: #eef1f0; color: #0e4d2b; }
+
+.nav-flotante .alerta-punto {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ff6b5e;
+}
+
+/* --- Cabecera de paso dentro de las pantallas del recorrido --- */
+
+.paso-cab {
+  background: #0e4d2b;
+  color: #fff;
+  padding: 16px 30px;
+}
+
+.paso-id { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+
+.paso-n {
+  font-size: 0.72rem;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: #9fd4b6;
+  font-weight: 600;
+}
+
+.paso-id strong { font-size: 1.12rem; }
+
+.paso-proposito {
+  margin: 5px 0 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: #d5e8dd;
+  max-width: 88ch;
+}
+
+/* --- Navegación: inicio, pasos numerados y anterior/siguiente --- */
+
+.nav-flotante .nav-inicio,
+.nav-flotante .nav-mover {
+  font-weight: 600;
+  color: #bcd8c8;
+  padding: 9px 13px;
+}
+
+.nav-flotante .nav-mover:disabled { opacity: 0.35; cursor: default; }
+.nav-flotante .nav-mover:disabled:hover { background: transparent; }
+
+.nav-flotante .nav-sep {
+  width: 1px;
+  align-self: stretch;
+  margin: 5px 3px;
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.nav-flotante .paso-marca {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 19px;
+  height: 19px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.18);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.nav-flotante button.activa .paso-marca { background: #0e4d2b; color: #fff; }
+
+@media (max-width: 900px) {
+  .paso-cab { padding: 14px 16px; }
+  .nav-flotante .nav-mover { display: none; }
+}

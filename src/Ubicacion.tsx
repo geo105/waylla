@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import './Ubicacion.css'
 import Logo from './Logo'
 
@@ -18,6 +18,9 @@ const ZONAS: Ubic[] = [
   { nombre: 'Satipo (Junín)', center: [-11.252, -74.637], zoom: 12, conEjemplos: false },
   { nombre: 'Quillabamba (Cusco)', center: [-12.866, -72.691], zoom: 13, conEjemplos: false },
   { nombre: 'Villa Rica (Pasco)', center: [-10.734, -75.269], zoom: 13, conEjemplos: false },
+  { nombre: 'Sivia (VRAEM, Ayacucho)', center: [-12.5, -73.85], zoom: 12, conEjemplos: false },
+  { nombre: 'Pichari (VRAEM, Cusco)', center: [-12.514, -73.822], zoom: 12, conEjemplos: false },
+  { nombre: 'Kimbiri (VRAEM, Cusco)', center: [-12.634, -73.786], zoom: 12, conEjemplos: false },
   { nombre: 'Bagua (Amazonas)', center: [-5.645, -78.44], zoom: 12, conEjemplos: false },
 ]
 
@@ -38,10 +41,26 @@ export default function Ubicacion({
   const [resultados, setResultados] = useState<ResultadoOSM[]>([])
   const [cargando, setCargando] = useState(false)
   const [error, setError] = useState('')
+  const [online, setOnline] = useState(() => navigator.onLine)
+
+  useEffect(() => {
+    const handleOnline = () => setOnline(true)
+    const handleOffline = () => setOnline(false)
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+    return () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+    }
+  }, [])
 
   const buscar = async (e?: React.FormEvent) => {
     e?.preventDefault()
     if (!busqueda.trim()) return
+    if (!online) {
+      setError('La búsqueda necesita Internet. Puedes elegir una de las zonas guardadas.')
+      return
+    }
     setCargando(true)
     setError('')
     setResultados([])
@@ -84,18 +103,25 @@ export default function Ubicacion({
       <div className="u-cuerpo">
         <h1>¿Dónde está tu cooperativa?</h1>
         <p className="u-sub">
-          El mapa se abrirá centrado en la zona que elijas, con la capa de deforestación de esa
-          región.
+          Elige una zona guardada para trabajar sin señal. Con Internet también podrás buscar
+          cualquier ciudad o distrito del Perú.
         </p>
+
+        {!online && (
+          <div className="u-offline">
+            ● Modo offline activo: las zonas de esta lista y la captura de parcelas siguen funcionando.
+          </div>
+        )}
 
         <form className="u-buscador" onSubmit={buscar}>
           <input
             type="text"
-            placeholder="Busca una ciudad o distrito (ej. Jaén, Pichanaki, Bagua)"
+            placeholder={online ? 'Busca una ciudad o distrito' : 'Búsqueda no disponible sin Internet'}
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
+            disabled={!online}
           />
-          <button type="submit" disabled={cargando}>
+          <button type="submit" disabled={cargando || !online}>
             {cargando ? 'Buscando…' : 'Buscar'}
           </button>
         </form>

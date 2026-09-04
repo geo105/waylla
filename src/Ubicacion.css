@@ -7,6 +7,7 @@
   --tinta: #22333b;
   --gris: #f2f4f3;
   min-height: 100vh;
+  min-height: 100svh;
   background: var(--gris);
   color: var(--tinta);
   font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
@@ -16,7 +17,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 6vw;
+  padding: max(14px, env(safe-area-inset-top)) 6vw 14px;
   background: var(--verde-oscuro);
   color: #fff;
 }
@@ -50,6 +51,17 @@
 
 .u-sub { color: #4a5a55; margin: 0 0 28px; line-height: 1.5; }
 
+.u-offline {
+  margin: -12px 0 20px;
+  padding: 11px 13px;
+  border: 1px solid #e1bd6d;
+  border-radius: 10px;
+  background: #fff6df;
+  color: #65470f;
+  font-size: 0.86rem;
+  line-height: 1.4;
+}
+
 .u-buscador { display: flex; gap: 10px; }
 
 .u-buscador input {
@@ -62,6 +74,8 @@
 }
 
 .u-buscador input:focus { border-color: var(--cielo); }
+
+.u-buscador input:disabled { background: #e9eeeb; color: #65736e; }
 
 .u-buscador button {
   background: var(--verde);
@@ -146,4 +160,11 @@
   border: 1px solid var(--cielo);
   border-radius: 999px;
   padding: 1px 8px;
+}
+
+@media (max-width: 600px) {
+  .u-cuerpo { padding: 5vh 5vw max(24px, env(safe-area-inset-bottom)); }
+  .u-buscador { flex-direction: column; }
+  .u-buscador input, .u-buscador button { min-height: 46px; }
+  .u-zonas { grid-template-columns: 1fr; }
 }

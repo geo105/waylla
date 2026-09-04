@@ -1,41 +1,41 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import L from 'leaflet'
+import { Capacitor } from '@capacitor/core'
+import { Directory, Encoding, Filesystem } from '@capacitor/filesystem'
+import { Share } from '@capacitor/share'
 import 'leaflet/dist/leaflet.css'
 import './App.css'
 import Landing from './Landing'
 import Ubicacion, { type Ubic } from './Ubicacion'
 import Logo from './Logo'
+import './Extras.css'
+import { analizarEnNavegador } from './hansen'
+import Lotes from './Lotes'
+import Expediente from './Expediente'
+import Ruta, { type EstadoDoc } from './Ruta'
+import Vitrina, { PERFIL_VACIO, type Perfil } from './Vitrina'
+import { diagnosticarLote, type Lote, type Parcela as ParcelaEUDR } from './tipos'
+import {
+  loadOfflineParcels,
+  saveOfflineParcels,
+  type Estado,
+  type Fuente,
+  type OfflineParcel,
+} from './storage'
 
-// ---------------------------------------------------------------
-// Waylla - Prototipo de trazabilidad EUDR para café y cacao
-// Mapa satelital + delimitación de parcelas + semáforo de riesgo
-// ---------------------------------------------------------------
-
-type Estado = 'limpia' | 'alerta' | 'riesgo'
-
-type Fuente = 'offline' | 'gfw' | 'whisp'
-
-interface Parcela {
-  id: string
-  socio: string
-  vertices: [number, number][] // [lat, lng]
-  areaHa: number
-  estado: Estado
-  fuente: Fuente // cómo se determinó el estado
-  detalle?: string // texto del veredicto del análisis online
+interface Parcela extends OfflineParcel {
   verificando?: boolean
   layer?: L.Polygon
 }
 
-// Etiqueta corta para el badge de cada parcela
 const ETIQUETA_FUENTE: Record<Fuente, string> = {
-  offline: 'offline',
+  offline: 'guardado local',
   gfw: '✓ GFW',
   whisp: '✓ Whisp',
 }
 
-// Zonas de deforestación post-2020 (DEMO - en producción vienen de
-// Global Forest Watch / Sentinel-2). Coordenadas cerca de Jaén, Cajamarca.
+// Zonas de referencia incluidas dentro de la aplicación. Permiten mostrar el
+// flujo completo de la feria aunque el teléfono no tenga señal.
 const ZONAS_DEFORESTADAS: [number, number][][] = [
   [
     [-5.687, -78.788],
@@ -53,7 +53,6 @@ const ZONAS_DEFORESTADAS: [number, number][][] = [
   ],
 ]
 
-// Parcelas de ejemplo ya "mapeadas" por el técnico
 const PARCELAS_EJEMPLO: { socio: string; vertices: [number, number][] }[] = [
   {
     socio: 'M. Huamán',
@@ -91,118 +90,373 @@ const COLORES: Record<Estado, string> = {
   riesgo: '#d64545',
 }
 
-// Versión del dataset Hansen Global Forest Change para los tiles reales de GFW.
-// Si la capa no carga, sube el número (v1.11 = datos hasta 2023, v1.12 = 2024, etc.).
 const GFC_VERSION = 'gfc_v1.11'
+const WHISP_API = import.meta.env.VITE_WHISP_API as string | undefined
 
-// URL del backend que consulta Whisp (motor EUDR de la FAO). Ver carpeta server/.
-const WHISP_API = import.meta.env.VITE_WHISP_API ?? 'http://localhost:8787'
-
-// --- Geometría ---------------------------------------------------
-
-// Área aproximada del polígono en hectáreas (proyección equirectangular local)
 function areaHectareas(vertices: [number, number][]): number {
   if (vertices.length < 3) return 0
-  const R = 6371000
+  const radius = 6371000
   const lat0 = (vertices[0][0] * Math.PI) / 180
-  const pts = vertices.map(([lat, lng]) => [
-    ((lng * Math.PI) / 180) * R * Math.cos(lat0),
-    ((lat * Math.PI) / 180) * R,
+  const points = vertices.map(([lat, lng]) => [
+    ((lng * Math.PI) / 180) * radius * Math.cos(lat0),
+    ((lat * Math.PI) / 180) * radius,
   ])
-  let a = 0
-  for (let i = 0; i < pts.length; i++) {
-    const [x1, y1] = pts[i]
-    const [x2, y2] = pts[(i + 1) % pts.length]
-    a += x1 * y2 - x2 * y1
+  let area = 0
+  for (let index = 0; index < points.length; index += 1) {
+    const [x1, y1] = points[index]
+    const [x2, y2] = points[(index + 1) % points.length]
+    area += x1 * y2 - x2 * y1
   }
-  return Math.abs(a / 2) / 10000
+  return Math.abs(area / 2) / 10000
 }
 
-// Test punto-en-polígono (ray casting)
-function puntoEnPoligono(p: [number, number], poly: [number, number][]): boolean {
-  let dentro = false
-  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-    const [yi, xi] = poly[i]
-    const [yj, xj] = poly[j]
-    if (yi > p[0] !== yj > p[0] && p[1] < ((xj - xi) * (p[0] - yi)) / (yj - yi) + xi) {
-      dentro = !dentro
+function puntoEnPoligono(point: [number, number], polygon: [number, number][]): boolean {
+  let inside = false
+  for (let index = 0, previous = polygon.length - 1; index < polygon.length; previous = index++) {
+    const [lat, lng] = polygon[index]
+    const [previousLat, previousLng] = polygon[previous]
+    if (
+      lat > point[0] !== previousLat > point[0] &&
+      point[1] < ((previousLng - lng) * (point[0] - lat)) / (previousLat - lat) + lng
+    ) {
+      inside = !inside
     }
   }
-  return dentro
+  return inside
 }
 
 function distanciaM(a: [number, number], b: [number, number]): number {
-  const R = 6371000
-  const dLat = ((b[0] - a[0]) * Math.PI) / 180
-  const dLng = ((b[1] - a[1]) * Math.PI) / 180
-  const la = (a[0] * Math.PI) / 180
-  const x = dLng * Math.cos(la) * R
-  const y = dLat * R
+  const radius = 6371000
+  const deltaLat = ((b[0] - a[0]) * Math.PI) / 180
+  const deltaLng = ((b[1] - a[1]) * Math.PI) / 180
+  const latitude = (a[0] * Math.PI) / 180
+  const x = deltaLng * Math.cos(latitude) * radius
+  const y = deltaLat * radius
   return Math.sqrt(x * x + y * y)
 }
 
-// Semáforo: riesgo si algún vértice o el centroide cae en zona deforestada;
-// alerta si está a menos de 600 m de una; limpia en el resto de casos.
 function evaluarEstado(vertices: [number, number][]): Estado {
   const centroide: [number, number] = [
-    vertices.reduce((s, v) => s + v[0], 0) / vertices.length,
-    vertices.reduce((s, v) => s + v[1], 0) / vertices.length,
+    vertices.reduce((sum, vertex) => sum + vertex[0], 0) / vertices.length,
+    vertices.reduce((sum, vertex) => sum + vertex[1], 0) / vertices.length,
   ]
-  const puntos = [...vertices, centroide]
-  for (const zona of ZONAS_DEFORESTADAS) {
-    if (puntos.some((p) => puntoEnPoligono(p, zona))) return 'riesgo'
+  const points = [...vertices, centroide]
+
+  for (const zone of ZONAS_DEFORESTADAS) {
+    if (points.some((point) => puntoEnPoligono(point, zone))) return 'riesgo'
   }
-  for (const zona of ZONAS_DEFORESTADAS) {
-    for (const p of puntos) {
-      if (zona.some((z) => distanciaM(p, z) < 600)) return 'alerta'
+  for (const zone of ZONAS_DEFORESTADAS) {
+    for (const point of points) {
+      if (zone.some((zonePoint) => distanciaM(point, zonePoint) < 600)) return 'alerta'
     }
   }
   return 'limpia'
 }
 
-// --- Componente principal ---------------------------------------
+function escapeHtml(value: string): string {
+  return value.replace(
+    /[&<>'"]/g,
+    (character) =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#039;', '"': '&quot;' })[character] ??
+      character,
+  )
+}
 
-function MapaApp({ ubic, onInicio }: { ubic: Ubic; onInicio: () => void }) {
+function toOfflineParcel(parcel: Parcela): OfflineParcel {
+  return {
+    id: parcel.id,
+    socio: parcel.socio,
+    vertices: parcel.vertices,
+    areaHa: parcel.areaHa,
+    estado: parcel.estado,
+    fuente: parcel.fuente,
+    detalle: parcel.detalle,
+  }
+}
+
+function MapaApp({
+  ubic,
+  onInicio,
+  onParcelas,
+}: {
+  ubic: Ubic
+  onInicio: () => void
+  onParcelas?: (p: Parcela[]) => void
+}) {
   const mapRef = useRef<L.Map | null>(null)
   const mapDivRef = useRef<HTMLDivElement | null>(null)
+  const satelliteLayerRef = useRef<L.TileLayer | null>(null)
+  const forestLayerRef = useRef<L.TileLayer | null>(null)
   const dibujoRef = useRef<{
     puntos: [number, number][]
     marcas: L.CircleMarker[]
     linea: L.Polyline | null
   }>({ puntos: [], marcas: [], linea: null })
-  const [parcelas, setParcelas] = useState<Parcela[]>([])
-  const [dibujando, setDibujando] = useState(false)
-  const [nVertices, setNVertices] = useState(0)
   const dibujandoRef = useRef(false)
   const contadorRef = useRef(1)
+  const [parcelas, setParcelas] = useState<Parcela[]>([])
 
-  const agregarParcela = useCallback((socio: string, vertices: [number, number][]) => {
-    const map = mapRef.current
-    if (!map) return
-    const estado = evaluarEstado(vertices)
-    const areaHa = areaHectareas(vertices)
-    const id = `P-${String(contadorRef.current++).padStart(3, '0')}`
-    const layer = L.polygon(vertices, {
-      color: COLORES[estado],
-      weight: 3,
-      fillColor: COLORES[estado],
-      fillOpacity: 0.25,
-    }).addTo(map)
-    layer.bindPopup(
-      `<b>${id}</b> · ${socio}<br/>${areaHa.toFixed(2)} ha · <b style="color:${COLORES[estado]}">${estado}</b>`,
-    )
-    setParcelas((prev) => [...prev, { id, socio, vertices, areaHa, estado, fuente: 'offline', layer }])
+  // Comparte las parcelas con las pantallas de lotes, ruta y vitrina.
+  useEffect(() => {
+    onParcelas?.(parcelas)
+  }, [parcelas, onParcelas])
+  const [dibujando, setDibujando] = useState(false)
+  const [nVertices, setNVertices] = useState(0)
+  const [solicitandoNombre, setSolicitandoNombre] = useState(false)
+  const [nombreSocio, setNombreSocio] = useState('Productor de prueba')
+  const [hidratado, setHidratado] = useState(false)
+  const [errorGuardado, setErrorGuardado] = useState(false)
+  const [online, setOnline] = useState(() => navigator.onLine)
+
+  useEffect(() => {
+    const handleOnline = () => setOnline(true)
+    const handleOffline = () => setOnline(false)
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+    return () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+    }
   }, [])
 
-  // Actualiza el color del polígono en el mapa según su estado
-  const pintarLayer = (p: Parcela, estado: Estado) => {
-    p.layer?.setStyle({ color: COLORES[estado], fillColor: COLORES[estado] })
+  const agregarParcela = useCallback(
+    (socio: string, vertices: [number, number][], saved?: OfflineParcel) => {
+      const map = mapRef.current
+      if (!map) return
+
+      const estado = saved?.estado ?? evaluarEstado(vertices)
+      const areaHa = saved?.areaHa ?? areaHectareas(vertices)
+      const id = saved?.id ?? `P-${String(contadorRef.current).padStart(3, '0')}`
+      const idNumber = Number.parseInt(id.replace(/\D/g, ''), 10)
+      if (Number.isFinite(idNumber)) contadorRef.current = Math.max(contadorRef.current, idNumber + 1)
+      else contadorRef.current += 1
+
+      const layer = L.polygon(vertices, {
+        color: COLORES[estado],
+        weight: 3,
+        fillColor: COLORES[estado],
+        fillOpacity: 0.28,
+      }).addTo(map)
+      layer.bindPopup(
+        `<b>${escapeHtml(id)}</b> · ${escapeHtml(socio)}<br/>${areaHa.toFixed(2)} ha · <b style="color:${COLORES[estado]}">${estado}</b>`,
+      )
+
+      setParcelas((previous) => {
+        if (previous.some((parcel) => parcel.id === id)) {
+          layer.remove()
+          return previous
+        }
+        return [
+          ...previous,
+          {
+            id,
+            socio,
+            vertices,
+            areaHa,
+            estado,
+            fuente: saved?.fuente ?? 'offline',
+            detalle: saved?.detalle,
+            layer,
+          },
+        ]
+      })
+    },
+    [],
+  )
+
+  useEffect(() => {
+    if (mapRef.current || !mapDivRef.current) return
+    let active = true
+    const map = L.map(mapDivRef.current, { center: ubic.center, zoom: ubic.zoom, zoomControl: true })
+    mapRef.current = map
+
+    const satelliteLayer = L.tileLayer(
+      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      { attribution: 'Imágenes © Esri, Maxar, Earthstar Geographics', maxZoom: 19 },
+    )
+    const forestLayer = L.tileLayer(
+      `https://storage.googleapis.com/earthenginepartners-hansen/tiles/${GFC_VERSION}/loss_alpha/{z}/{x}/{y}.png`,
+      {
+        attribution: 'Pérdida de bosque: Hansen/UMD/Google/USGS/NASA',
+        maxNativeZoom: 12,
+        maxZoom: 19,
+        opacity: 0.8,
+      },
+    )
+    satelliteLayerRef.current = satelliteLayer
+    forestLayerRef.current = forestLayer
+    if (navigator.onLine) {
+      satelliteLayer.addTo(map)
+      forestLayer.addTo(map)
+    }
+
+    const zonasDemo = L.layerGroup(
+      ZONAS_DEFORESTADAS.map((zone) =>
+        L.polygon(zone, {
+          color: '#d64545',
+          weight: 2,
+          fillColor: '#d64545',
+          fillOpacity: 0.35,
+          dashArray: '6 4',
+        }).bindTooltip('Zona de referencia incluida para la demostración offline', { sticky: true }),
+      ),
+    ).addTo(map)
+
+    L.control
+      .layers(
+        { 'Satélite Esri (online)': satelliteLayer },
+        {
+          'Pérdida de bosque GFW (online)': forestLayer,
+          'Zonas de referencia (offline)': zonasDemo,
+        },
+        { collapsed: true, position: 'topright' },
+      )
+      .addTo(map)
+
+    map.on('click', (event: L.LeafletMouseEvent) => {
+      if (!dibujandoRef.current) return
+      const drawing = dibujoRef.current
+      const point: [number, number] = [event.latlng.lat, event.latlng.lng]
+      drawing.puntos.push(point)
+      drawing.marcas.push(
+        L.circleMarker(point, {
+          radius: 5,
+          color: '#0fa3b1',
+          fillColor: '#0fa3b1',
+          fillOpacity: 1,
+        }).addTo(map),
+      )
+      if (drawing.linea) drawing.linea.setLatLngs(drawing.puntos)
+      else {
+        drawing.linea = L.polyline(drawing.puntos, {
+          color: '#0fa3b1',
+          weight: 2,
+          dashArray: '4 4',
+        }).addTo(map)
+      }
+      setNVertices(drawing.puntos.length)
+    })
+
+    const hydrate = async () => {
+      try {
+        const stored = await loadOfflineParcels()
+        if (!active) return
+        if (stored === null && ubic.conEjemplos) {
+          PARCELAS_EJEMPLO.forEach((parcel) => agregarParcela(parcel.socio, parcel.vertices))
+        } else {
+          stored?.forEach((parcel) => agregarParcela(parcel.socio, parcel.vertices, parcel))
+        }
+      } finally {
+        if (active) setHidratado(true)
+      }
+    }
+    void hydrate()
+
+    return () => {
+      active = false
+      map.remove()
+      mapRef.current = null
+      satelliteLayerRef.current = null
+      forestLayerRef.current = null
+    }
+  }, [agregarParcela, ubic])
+
+  useEffect(() => {
+    const map = mapRef.current
+    const satellite = satelliteLayerRef.current
+    const forest = forestLayerRef.current
+    if (!map || !satellite || !forest) return
+
+    if (online) {
+      if (!map.hasLayer(satellite)) satellite.addTo(map)
+      if (!map.hasLayer(forest)) forest.addTo(map)
+    } else {
+      if (map.hasLayer(satellite)) map.removeLayer(satellite)
+      if (map.hasLayer(forest)) map.removeLayer(forest)
+    }
+  }, [online])
+
+  useEffect(() => {
+    if (!hidratado) return
+    const save = async () => {
+      try {
+        await saveOfflineParcels(parcelas.map(toOfflineParcel))
+        setErrorGuardado(false)
+      } catch {
+        setErrorGuardado(true)
+      }
+    }
+    void save()
+  }, [hidratado, parcelas])
+
+  const limpiarDibujo = () => {
+    const drawing = dibujoRef.current
+    drawing.marcas.forEach((marker) => marker.remove())
+    drawing.linea?.remove()
+    dibujoRef.current = { puntos: [], marcas: [], linea: null }
+    setNVertices(0)
   }
 
-  // Nivel 2: envía la parcela al backend, que consulta Whisp (motor EUDR de la FAO)
-  const verificarConWhisp = async (parcela: Parcela) => {
-    setParcelas((prev) =>
-      prev.map((p) => (p.id === parcela.id ? { ...p, verificando: true } : p)),
+  const iniciarDibujo = () => {
+    dibujandoRef.current = true
+    setDibujando(true)
+    setSolicitandoNombre(false)
+    setNombreSocio('Productor de prueba')
+    limpiarDibujo()
+  }
+
+  const solicitarCierre = () => {
+    const drawing = dibujoRef.current
+    if (drawing.puntos.length < 3) {
+      window.alert('Marca al menos 3 vértices en el mapa para cerrar la parcela.')
+      return
+    }
+    setSolicitandoNombre(true)
+  }
+
+  const confirmarParcela = () => {
+    agregarParcela(nombreSocio.trim() || 'Productor de prueba', [...dibujoRef.current.puntos])
+    limpiarDibujo()
+    dibujandoRef.current = false
+    setDibujando(false)
+    setSolicitandoNombre(false)
+  }
+
+  const cancelarDibujo = () => {
+    limpiarDibujo()
+    dibujandoRef.current = false
+    setDibujando(false)
+    setSolicitandoNombre(false)
+  }
+
+  const verParcela = (parcel: Parcela) => {
+    if (!mapRef.current || !parcel.layer) return
+    mapRef.current.fitBounds(parcel.layer.getBounds(), { padding: [40, 40] })
+    parcel.layer.openPopup()
+  }
+
+  const eliminarParcela = (parcel: Parcela) => {
+    if (!window.confirm(`¿Eliminar ${parcel.id} de este teléfono?`)) return
+    parcel.layer?.remove()
+    setParcelas((previous) => previous.filter((item) => item.id !== parcel.id))
+  }
+
+  const borrarDatosLocales = () => {
+    if (!window.confirm('¿Borrar todas las parcelas guardadas en este teléfono?')) return
+    parcelas.forEach((parcel) => parcel.layer?.remove())
+    setParcelas([])
+  }
+
+  const pintarLayer = (parcel: Parcela, estado: Estado) => {
+    parcel.layer?.setStyle({ color: COLORES[estado], fillColor: COLORES[estado] })
+  }
+
+  const verificarConWhisp = async (parcel: Parcela) => {
+    // Sin servidor configurado el análisis corre en el propio navegador,
+    // así la verificación también funciona en la web publicada.
+    if (!online) return
+    setParcelas((previous) =>
+      previous.map((item) => (item.id === parcel.id ? { ...item, verificando: true } : item)),
     )
     try {
       const geojson = {
@@ -210,11 +464,11 @@ function MapaApp({ ubic, onInicio }: { ubic: Ubic; onInicio: () => void }) {
         features: [
           {
             type: 'Feature',
-            properties: { id: parcela.id, socio: parcela.socio },
+            properties: { id: parcel.id, socio: parcel.socio },
             geometry: {
               type: 'Polygon',
               coordinates: [
-                [...parcela.vertices, parcela.vertices[0]].map(([lat, lng]) => [
+                [...parcel.vertices, parcel.vertices[0]].map(([lat, lng]) => [
                   Number(lng.toFixed(6)),
                   Number(lat.toFixed(6)),
                 ]),
@@ -223,19 +477,34 @@ function MapaApp({ ubic, onInicio }: { ubic: Ubic; onInicio: () => void }) {
           },
         ],
       }
-      const resp = await fetch(`${WHISP_API}/verificar`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(geojson),
-      })
-      if (!resp.ok) throw new Error(`El servidor respondió ${resp.status}`)
-      const data: { estado: Estado; detalle?: string; fuente?: Fuente } = await resp.json()
-      setParcelas((prev) =>
-        prev.map((p) => {
-          if (p.id !== parcela.id) return p
-          pintarLayer(p, data.estado)
+      const anillo = geojson.features[0].geometry.coordinates[0] as [number, number][]
+
+      const porServidor = async () => {
+        const response = await fetch(`${WHISP_API}/verificar`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(geojson),
+        })
+        if (!response.ok) throw new Error(`El servicio respondió ${response.status}`)
+        return (await response.json()) as { estado: Estado; detalle?: string; fuente?: Fuente }
+      }
+
+      let data: { estado: Estado; detalle?: string; fuente?: Fuente }
+      if (WHISP_API) {
+        try {
+          data = await porServidor()
+        } catch {
+          data = await analizarEnNavegador(anillo)
+        }
+      } else {
+        data = await analizarEnNavegador(anillo)
+      }
+      setParcelas((previous) =>
+        previous.map((item) => {
+          if (item.id !== parcel.id) return item
+          pintarLayer(item, data.estado)
           return {
-            ...p,
+            ...item,
             estado: data.estado,
             fuente: data.fuente ?? 'gfw',
             detalle: data.detalle,
@@ -243,156 +512,37 @@ function MapaApp({ ubic, onInicio }: { ubic: Ubic; onInicio: () => void }) {
           }
         }),
       )
-    } catch (err) {
-      setParcelas((prev) =>
-        prev.map((p) => (p.id === parcela.id ? { ...p, verificando: false } : p)),
+    } catch (error) {
+      setParcelas((previous) =>
+        previous.map((item) => (item.id === parcel.id ? { ...item, verificando: false } : item)),
       )
       window.alert(
-        'No se pudo verificar. ¿Está corriendo el servidor (carpeta server/, con "npm start")? ' +
-          `Detalle: ${(err as Error).message}`,
+        'No se pudo verificar en línea. El semáforo sin conexión sigue siendo válido. ' +
+          `Detalle: ${(error as Error).message}`,
       )
     }
   }
 
   const verificarTodas = async () => {
-    for (const p of parcelas) {
-      await verificarConWhisp(p)
-    }
+    for (const parcel of parcelas) await verificarConWhisp(parcel)
   }
 
-  // Inicializa el mapa una sola vez
-  useEffect(() => {
-    if (mapRef.current || !mapDivRef.current) return
-    const map = L.map(mapDivRef.current, { center: ubic.center, zoom: ubic.zoom })
-    mapRef.current = map
-
-    // Imagen satelital (Esri World Imagery, uso libre con atribución)
-    L.tileLayer(
-      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-      { attribution: 'Imágenes © Esri, Maxar, Earthstar Geographics', maxZoom: 19 },
-    ).addTo(map)
-
-    // --- CAPA REAL: pérdida de bosque de Global Forest Watch / Hansen (UMD) ---
-    // Píxeles rojos = pérdida de cobertura arbórea detectada por satélite.
-    // Fuente pública (Hansen Global Forest Change), no requiere clave.
-    const perdidaBosqueReal = L.tileLayer(
-      `https://storage.googleapis.com/earthenginepartners-hansen/tiles/${GFC_VERSION}/loss_alpha/{z}/{x}/{y}.png`,
-      {
-        attribution: 'Pérdida de bosque: Hansen/UMD/Google/USGS/NASA (Global Forest Watch)',
-        maxNativeZoom: 12, // los tiles existen hasta z12; Leaflet los amplía para zooms mayores
-        maxZoom: 19,
-        opacity: 0.8,
-      },
-    ).addTo(map)
-
-    // Zonas de deforestación de referencia (demo, para el semáforo offline)
-    const zonasDemo = L.layerGroup(
-      ZONAS_DEFORESTADAS.map((zona) =>
-        L.polygon(zona, {
-          color: '#d64545',
-          weight: 2,
-          fillColor: '#d64545',
-          fillOpacity: 0.35,
-          dashArray: '6 4',
-        }).bindTooltip('Zona de referencia para el semáforo offline (demo)', { sticky: true }),
-      ),
-    ).addTo(map)
-
-    // Control para prender/apagar cada capa
-    L.control
-      .layers(
-        undefined,
-        {
-          'Pérdida de bosque real (GFW)': perdidaBosqueReal,
-          'Zonas de referencia (demo offline)': zonasDemo,
-        },
-        { collapsed: false, position: 'topright' },
-      )
-      .addTo(map)
-
-    map.on('click', (e: L.LeafletMouseEvent) => {
-      if (!dibujandoRef.current) return
-      const d = dibujoRef.current
-      const p: [number, number] = [e.latlng.lat, e.latlng.lng]
-      d.puntos.push(p)
-      d.marcas.push(
-        L.circleMarker(p, { radius: 5, color: '#0fa3b1', fillColor: '#0fa3b1', fillOpacity: 1 }).addTo(
-          map,
-        ),
-      )
-      if (d.linea) d.linea.setLatLngs(d.puntos)
-      else d.linea = L.polyline(d.puntos, { color: '#0fa3b1', weight: 2, dashArray: '4 4' }).addTo(map)
-      setNVertices(d.puntos.length)
-    })
-
-    // Carga las parcelas de ejemplo solo en la zona demo
-    if (ubic.conEjemplos) PARCELAS_EJEMPLO.forEach((p) => agregarParcela(p.socio, p.vertices))
-
-    return () => {
-      // Limpieza (importante en dev: StrictMode monta el efecto dos veces)
-      map.remove()
-      mapRef.current = null
-      setParcelas([])
-      contadorRef.current = 1
-    }
-  }, [agregarParcela, ubic])
-
-  const limpiarDibujo = () => {
-    const d = dibujoRef.current
-    d.marcas.forEach((m) => m.remove())
-    d.linea?.remove()
-    dibujoRef.current = { puntos: [], marcas: [], linea: null }
-    setNVertices(0)
-  }
-
-  const iniciarDibujo = () => {
-    dibujandoRef.current = true
-    setDibujando(true)
-    limpiarDibujo()
-  }
-
-  const cerrarPoligono = () => {
-    const d = dibujoRef.current
-    if (d.puntos.length < 3) {
-      window.alert('Marca al menos 3 vértices caminando el perímetro (haz clic en el mapa).')
-      return
-    }
-    const socio = window.prompt('Nombre del socio productor:', 'Socio nuevo') || 'Socio nuevo'
-    agregarParcela(socio, [...d.puntos])
-    limpiarDibujo()
-    dibujandoRef.current = false
-    setDibujando(false)
-  }
-
-  const cancelarDibujo = () => {
-    limpiarDibujo()
-    dibujandoRef.current = false
-    setDibujando(false)
-  }
-
-  const verParcela = (p: Parcela) => {
-    if (!mapRef.current || !p.layer) return
-    mapRef.current.fitBounds(p.layer.getBounds(), { padding: [40, 40] })
-    p.layer.openPopup()
-  }
-
-  // Exporta las parcelas como GeoJSON con la precisión que exige el EUDR
-  const exportarGeoJSON = () => {
-    const fc = {
+  const exportarGeoJSON = async () => {
+    const featureCollection = {
       type: 'FeatureCollection',
-      features: parcelas.map((p) => ({
+      features: parcelas.map((parcel) => ({
         type: 'Feature',
         properties: {
-          id: p.id,
-          socio: p.socio,
-          area_ha: Number(p.areaHa.toFixed(4)),
-          estado_eudr: p.estado,
+          id: parcel.id,
+          socio: parcel.socio,
+          area_ha: Number(parcel.areaHa.toFixed(4)),
+          estado_eudr: parcel.estado,
           linea_base: '2020-12-31',
         },
         geometry: {
           type: 'Polygon',
           coordinates: [
-            [...p.vertices, p.vertices[0]].map(([lat, lng]) => [
+            [...parcel.vertices, parcel.vertices[0]].map(([lat, lng]) => [
               Number(lng.toFixed(6)),
               Number(lat.toFixed(6)),
             ]),
@@ -400,18 +550,45 @@ function MapaApp({ ubic, onInicio }: { ubic: Ubic; onInicio: () => void }) {
         },
       })),
     }
-    const blob = new Blob([JSON.stringify(fc, null, 2)], { type: 'application/geo+json' })
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(blob)
-    a.download = 'waylla_parcelas.geojson'
-    a.click()
-    URL.revokeObjectURL(a.href)
+    const json = JSON.stringify(featureCollection, null, 2)
+    const fileName = `waylla_parcelas_${new Date().toISOString().slice(0, 10)}.geojson`
+
+    if (Capacitor.isNativePlatform()) {
+      const saved = await Filesystem.writeFile({
+        path: fileName,
+        data: json,
+        directory: Directory.Cache,
+        encoding: Encoding.UTF8,
+      })
+      await Share.share({
+        title: 'Parcelas Waylla',
+        text: 'Archivo GeoJSON exportado desde Waylla Campo',
+        url: saved.uri,
+        dialogTitle: 'Compartir parcelas',
+      })
+      return
+    }
+
+    const file = new File([json], fileName, {
+      type: 'application/geo+json',
+    })
+
+    if (navigator.canShare?.({ files: [file] })) {
+      await navigator.share({ title: 'Parcelas Waylla', files: [file] })
+      return
+    }
+
+    const anchor = document.createElement('a')
+    anchor.href = URL.createObjectURL(file)
+    anchor.download = file.name
+    anchor.click()
+    URL.revokeObjectURL(anchor.href)
   }
 
   const resumen = {
-    limpia: parcelas.filter((p) => p.estado === 'limpia').length,
-    alerta: parcelas.filter((p) => p.estado === 'alerta').length,
-    riesgo: parcelas.filter((p) => p.estado === 'riesgo').length,
+    limpia: parcelas.filter((parcel) => parcel.estado === 'limpia').length,
+    alerta: parcelas.filter((parcel) => parcel.estado === 'alerta').length,
+    riesgo: parcelas.filter((parcel) => parcel.estado === 'riesgo').length,
   }
 
   return (
@@ -422,33 +599,60 @@ function MapaApp({ ubic, onInicio }: { ubic: Ubic; onInicio: () => void }) {
             ← Inicio
           </button>
           <div>
-            <h1><Logo size={24} /> Waylla</h1>
-            <span className="subtitulo">
-              Trazabilidad libre de deforestación · {ubic.nombre}
-            </span>
+            <h1>
+              <Logo size={24} /> Waylla Campo
+            </h1>
+            <span className="subtitulo">{ubic.nombre}</span>
           </div>
         </div>
-        <div className="resumen">
-          <span className="chip limpia">{resumen.limpia} limpias</span>
-          <span className="chip alerta">{resumen.alerta} en alerta</span>
-          <span className="chip riesgo">{resumen.riesgo} en riesgo</span>
+        <div className="estado-app">
+          <span className={`conexion ${online ? 'online' : 'offline'}`}>
+            {online ? '● En línea' : '● Modo offline'}
+          </span>
+          <div className="resumen">
+            <span className="chip limpia">{resumen.limpia} limpias</span>
+            <span className="chip alerta">{resumen.alerta} alerta</span>
+            <span className="chip riesgo">{resumen.riesgo} riesgo</span>
+          </div>
         </div>
       </header>
 
       <div className="contenido">
         <aside className="panel">
+          <div className={`estado-guardado ${errorGuardado ? 'error' : ''}`}>
+            {errorGuardado
+              ? 'No se pudo guardar. Revisa el espacio del teléfono.'
+              : '✓ Parcelas guardadas en este dispositivo'}
+          </div>
+
           <div className="acciones">
             {!dibujando ? (
               <button className="btn principal" onClick={iniciarDibujo}>
                 + Nueva parcela
               </button>
+            ) : solicitandoNombre ? (
+              <div className="form-parcela">
+                <label htmlFor="nombre-socio">Nombre del productor</label>
+                <input
+                  id="nombre-socio"
+                  value={nombreSocio}
+                  onChange={(event) => setNombreSocio(event.target.value)}
+                  autoFocus
+                />
+                <button className="btn principal" onClick={confirmarParcela}>
+                  Guardar parcela en el teléfono
+                </button>
+                <button className="btn" onClick={() => setSolicitandoNombre(false)}>
+                  Volver al mapa
+                </button>
+              </div>
             ) : (
               <>
                 <p className="ayuda">
-                  Haz clic en el mapa para marcar los vértices del perímetro ({nVertices} marcados).
+                  Toca el mapa para marcar el perímetro ({nVertices} vértices).
                 </p>
-                <button className="btn principal" onClick={cerrarPoligono}>
-                  Cerrar polígono
+                <button className="btn principal" onClick={solicitarCierre}>
+                  Cerrar y guardar
                 </button>
                 <button className="btn" onClick={cancelarDibujo}>
                   Cancelar
@@ -456,75 +660,329 @@ function MapaApp({ ubic, onInicio }: { ubic: Ubic; onInicio: () => void }) {
               </>
             )}
             <button className="btn" onClick={exportarGeoJSON} disabled={parcelas.length === 0}>
-              Exportar GeoJSON (EUDR)
+              Compartir GeoJSON
             </button>
             <button
               className="btn whisp"
               onClick={verificarTodas}
-              disabled={parcelas.length === 0 || parcelas.some((p) => p.verificando)}
+              disabled={
+                !online || !WHISP_API || parcelas.length === 0 || parcelas.some((parcel) => parcel.verificando)
+              }
+              title={!WHISP_API ? 'Esta edición funciona sin servidor. El servicio online se conectará después.' : ''}
             >
-              {parcelas.some((p) => p.verificando)
+              {parcelas.some((parcel) => parcel.verificando)
                 ? 'Analizando satélite…'
-                : 'Verificar deforestación (online)'}
+                : online && WHISP_API
+                  ? 'Verificar con satélite'
+                  : 'Verificación online no disponible'}
             </button>
           </div>
 
-          <h2>Parcelas ({parcelas.length})</h2>
+          <div className="panel-titulo">
+            <h2>Parcelas ({parcelas.length})</h2>
+            <button className="btn-texto peligro" onClick={borrarDatosLocales} disabled={parcelas.length === 0}>
+              Borrar todas
+            </button>
+          </div>
           <ul className="lista">
-            {parcelas.map((p) => (
-              <li key={p.id} onClick={() => verParcela(p)}>
-                <span className="punto" style={{ background: COLORES[p.estado] }} />
-                <div>
-                  <strong>{p.id}</strong> · {p.socio}
+            {parcelas.map((parcel) => (
+              <li key={parcel.id} onClick={() => verParcela(parcel)}>
+                <span className="punto" style={{ background: COLORES[parcel.estado] }} />
+                <div className="parcela-info">
+                  <strong>{parcel.id}</strong> · {parcel.socio}
                   <small>
-                    {p.areaHa.toFixed(2)} ha · {p.estado}
-                    <span className={`fuente ${p.fuente}`}>
-                      {p.verificando ? '⏳…' : ETIQUETA_FUENTE[p.fuente]}
+                    {parcel.areaHa.toFixed(2)} ha · {parcel.estado}
+                    <span className={`fuente ${parcel.fuente}`}>
+                      {parcel.verificando ? 'analizando…' : ETIQUETA_FUENTE[parcel.fuente]}
                     </span>
                   </small>
                 </div>
+                <button
+                  className="eliminar-parcela"
+                  aria-label={`Eliminar ${parcel.id}`}
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    eliminarParcela(parcel)
+                  }}
+                >
+                  ×
+                </button>
               </li>
             ))}
           </ul>
 
           <footer className="nota">
-            Las zonas rojas son deforestación posterior al 31/12/2020 (datos de demostración; en
-            producción provienen de Sentinel-2 / Global Forest Watch). El semáforo se calcula al
-            cerrar cada polígono.
+            El semáforo offline es una evaluación preliminar con zonas de demostración incluidas en
+            el teléfono. No reemplaza la verificación satelital oficial para un expediente EUDR.
           </footer>
         </aside>
 
-        <div ref={mapDivRef} className="mapa" />
+        <div className="map-stage">
+          {!online && (
+            <div className="offline-banner">
+              Sin Internet: puedes dibujar, guardar y exportar. El fondo satelital volverá cuando haya señal.
+            </div>
+          )}
+          <div ref={mapDivRef} className="mapa" />
+          <div className="offline-place">{ubic.nombre}</div>
+        </div>
       </div>
     </div>
   )
 }
 
-// --- Contenedor: muestra la portada o el mapa -------------------
+type Paso = 'parcelas' | 'lotes' | 'ruta' | 'vitrina'
+
+// El recorrido que sigue una cooperativa, de la chacra al comprador.
+const PASOS: { id: Paso; n: number; titulo: string; proposito: string }[] = [
+  {
+    id: 'parcelas',
+    n: 1,
+    titulo: 'Parcelas',
+    proposito:
+      'Levanta el polígono de cada parcela con seis decimales y contrástalo contra la capa satelital de pérdida de bosque.',
+  },
+  {
+    id: 'lotes',
+    n: 2,
+    titulo: 'Lotes y expediente',
+    proposito:
+      'Agrupa las parcelas de los socios en el lote que se embarca y emite el expediente de diligencia debida para el comprador.',
+  },
+  {
+    id: 'ruta',
+    n: 3,
+    titulo: 'Ruta al mercado',
+    proposito:
+      'Controla los veintidós documentos que exige una exportación: cuáles faltan, quién los emite y en qué orden.',
+  },
+  {
+    id: 'vitrina',
+    n: 4,
+    titulo: 'Vitrina',
+    proposito:
+      'Publica la ficha de la organización con el sello de origen verificado y accede al directorio de asociaciones.',
+  },
+]
+
+const CLAVE_EXTRA = 'waylla.extra.v1'
+
+interface Extra {
+  cooperativa: string
+  lotes: Lote[]
+  docs: Record<string, EstadoDoc>
+  perfil: Perfil
+}
+
+function guardado(): Extra {
+  const vacio: Extra = { cooperativa: '', lotes: [], docs: {}, perfil: PERFIL_VACIO }
+  try {
+    const crudo = window.localStorage.getItem(CLAVE_EXTRA)
+    if (!crudo) return vacio
+    const d = JSON.parse(crudo) as Partial<Extra>
+    return {
+      cooperativa: typeof d.cooperativa === 'string' ? d.cooperativa : '',
+      lotes: Array.isArray(d.lotes) ? d.lotes : [],
+      docs: d.docs && typeof d.docs === 'object' ? d.docs : {},
+      perfil: { ...PERFIL_VACIO, ...(d.perfil ?? {}) },
+    }
+  } catch {
+    return vacio
+  }
+}
 
 function App() {
   const [vista, setVista] = useState<'inicio' | 'ubicacion' | 'mapa'>('inicio')
   const [ubic, setUbic] = useState<Ubic | null>(null)
+  const [pestana, setPestana] = useState<
+    'parcelas' | 'lotes' | 'expediente' | 'ruta' | 'vitrina'
+  >('parcelas')
+
+  // Estado que comparten las pantallas nuevas
+  const [parcelas, setParcelas] = useState<Parcela[]>([])
+  const [lotes, setLotes] = useState<Lote[]>(() => guardado().lotes)
+  const [cooperativa, setCooperativa] = useState(() => guardado().cooperativa)
+  const [docs, setDocs] = useState<Record<string, EstadoDoc>>(() => guardado().docs)
+  const [perfil, setPerfil] = useState<Perfil>(() => guardado().perfil)
+
+  // Los lotes, el avance de la ruta y la ficha sobreviven a un recargado.
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        CLAVE_EXTRA,
+        JSON.stringify({ cooperativa, lotes, docs, perfil }),
+      )
+    } catch {
+      /* almacenamiento bloqueado: la sesión sigue en memoria */
+    }
+  }, [cooperativa, lotes, docs, perfil])
+  const [loteAbierto, setLoteAbierto] = useState<string | null>(null)
+
+  // Las pantallas nuevas piden comunidad y fecha, que la captura del mapa
+  // todavía no registra; se completan con valores vacíos.
+  const parcelasEUDR: ParcelaEUDR[] = parcelas.map((p) => ({
+    id: p.id,
+    socio: p.socio,
+    vertices: p.vertices,
+    areaHa: p.areaHa,
+    estado: p.estado,
+    fuente: p.fuente,
+    comunidad: (p as { comunidad?: string }).comunidad ?? '',
+    fecha: (p as { fecha?: string }).fecha ?? new Date().toISOString().slice(0, 10),
+    detalle: (p as { detalle?: string }).detalle,
+  }))
+
+  // El expediente pertenece al paso 2, aunque sea una pantalla aparte.
+  const pasoActivo: Paso = pestana === 'expediente' ? 'lotes' : pestana
+  const iPaso = PASOS.findIndex((x) => x.id === pasoActivo)
+  const paso = PASOS[iPaso]
+  const irAPaso = (i: number) => {
+    const destino = PASOS[Math.min(PASOS.length - 1, Math.max(0, i))]
+    setPestana(destino.id)
+  }
+
+  const lote = lotes.find((l) => l.id === loteAbierto) ?? null
+  const bloqueados = lotes.filter(
+    (l) => diagnosticarLote(l, parcelasEUDR).estado === 'bloqueado',
+  ).length
+
+  const volverInicio = () => {
+    setUbic(null)
+    setPestana('parcelas')
+    setVista('inicio')
+  }
 
   if (vista === 'inicio') return <Landing onComenzar={() => setVista('ubicacion')} />
-  if (vista === 'ubicacion' || !ubic)
+
+  if (vista === 'ubicacion' || !ubic) {
     return (
       <Ubicacion
-        onElegir={(u) => {
-          setUbic(u)
+        onElegir={(location) => {
+          setUbic(location)
+          setPestana('parcelas')
           setVista('mapa')
         }}
         onVolver={() => setVista('inicio')}
       />
     )
+  }
+
+  const barraCoop = (
+    <div className="coop-barra">
+      <label>
+        Cooperativa
+        <input
+          value={cooperativa}
+          onChange={(e) => setCooperativa(e.target.value)}
+          placeholder="Nombre de la cooperativa"
+        />
+      </label>
+    </div>
+  )
+
   return (
-    <MapaApp
-      ubic={ubic}
-      onInicio={() => {
-        setUbic(null)
-        setVista('inicio')
-      }}
-    />
+    <>
+      {/* El mapa se mantiene montado para no perder las capas de Leaflet */}
+      <div style={{ display: pestana === 'parcelas' ? 'contents' : 'none' }}>
+        <MapaApp ubic={ubic} onInicio={volverInicio} onParcelas={setParcelas} />
+      </div>
+
+      {pestana !== 'parcelas' && (
+        <div className="pantalla-extra">
+          <div className="paso-cab">
+            <div className="paso-id">
+              <span className="paso-n">Paso {paso.n} de {PASOS.length}</span>
+              <strong>{paso.titulo}</strong>
+            </div>
+            <p className="paso-proposito">{paso.proposito}</p>
+          </div>
+          {barraCoop}
+          {pestana === 'lotes' && (
+            <Lotes
+              parcelas={parcelasEUDR}
+              lotes={lotes}
+              onCrear={(l) => setLotes((prev) => [...prev, l])}
+              onActualizar={(l) => setLotes((prev) => prev.map((x) => (x.id === l.id ? l : x)))}
+              onEliminar={(id) => setLotes((prev) => prev.filter((x) => x.id !== id))}
+              onVerExpediente={(id) => {
+                setLoteAbierto(id)
+                setPestana('expediente')
+              }}
+            />
+          )}
+          {pestana === 'expediente' && lote && (
+            <Expediente
+              lote={lote}
+              parcelas={parcelasEUDR}
+              cooperativa={cooperativa}
+              onVolver={() => setPestana('lotes')}
+            />
+          )}
+          {pestana === 'ruta' && (
+            <Ruta
+              cooperativa={cooperativa}
+              parcelas={parcelasEUDR}
+              lotes={lotes}
+              estados={docs}
+              onCambiar={(id, estado) => setDocs((prev) => ({ ...prev, [id]: estado }))}
+            />
+          )}
+          {pestana === 'vitrina' && (
+            <Vitrina
+              cooperativa={cooperativa}
+              parcelas={parcelasEUDR}
+              perfil={perfil}
+              onCambiar={setPerfil}
+            />
+          )}
+        </div>
+      )}
+
+      <nav className="nav-flotante" aria-label="Recorrido de Waylla">
+        <button className="nav-inicio" onClick={volverInicio} title="Volver a la portada">
+          Inicio
+        </button>
+
+        <span className="nav-sep" aria-hidden="true" />
+
+        <button
+          className="nav-mover"
+          onClick={() => irAPaso(iPaso - 1)}
+          disabled={iPaso <= 0}
+          title="Paso anterior"
+        >
+          ‹ Anterior
+        </button>
+
+        {PASOS.map((x, i) => (
+          <button
+            key={x.id}
+            className={pasoActivo === x.id ? 'activa' : ''}
+            onClick={() => irAPaso(i)}
+            aria-current={pasoActivo === x.id ? 'step' : undefined}
+          >
+            <span className="paso-marca">{x.n}</span>
+            {x.titulo}
+            {x.id === 'parcelas' && parcelas.length > 0 && (
+              <span className="cuenta">{parcelas.length}</span>
+            )}
+            {x.id === 'lotes' && lotes.length > 0 && <span className="cuenta">{lotes.length}</span>}
+            {x.id === 'lotes' && bloqueados > 0 && (
+              <span className="alerta-punto" title="Lote bloqueado" />
+            )}
+          </button>
+        ))}
+
+        <button
+          className="nav-mover"
+          onClick={() => irAPaso(iPaso + 1)}
+          disabled={iPaso >= PASOS.length - 1}
+          title="Paso siguiente"
+        >
+          Siguiente ›
+        </button>
+      </nav>
+    </>
   )
 }
 

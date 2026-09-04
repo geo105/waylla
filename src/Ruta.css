@@ -1,0 +1,233 @@
+/* Ruta al mercado: el camino completo hasta el embarque */
+
+.ruta {
+  padding: 26px 30px 60px;
+  max-width: 1100px;
+  margin: 0 auto;
+  color: #22333b;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+.ruta-cab {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 32px;
+  flex-wrap: wrap;
+}
+
+.ruta h2 {
+  margin: 0 0 6px;
+  font-size: 1.5rem;
+  color: #0e4d2b;
+}
+
+.ruta-sub {
+  margin: 0;
+  max-width: 62ch;
+  color: #4a5a55;
+  line-height: 1.55;
+  font-size: 0.94rem;
+}
+
+/* Medidor de avance */
+
+.medidor {
+  flex-shrink: 0;
+  min-width: 200px;
+  background: #fff;
+  border: 1px solid #e2e8e5;
+  border-radius: 14px;
+  padding: 16px 20px;
+}
+
+.medidor strong {
+  display: block;
+  font-size: 2.1rem;
+  line-height: 1;
+  color: #1b7a43;
+  font-variant-numeric: tabular-nums;
+}
+
+.medidor span {
+  display: block;
+  margin: 4px 0 10px;
+  font-size: 0.83rem;
+  color: #4a5a55;
+}
+
+.medidor .barra {
+  height: 7px;
+  background: #e7ecea;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.medidor .barra i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #1b7a43, #2eae60);
+  transition: width 0.3s ease;
+}
+
+.ruta-siguiente {
+  margin: 20px 0 0;
+  padding: 12px 16px;
+  background: #eef6f1;
+  border-left: 3px solid #1b7a43;
+  border-radius: 0 9px 9px 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: #14603a;
+}
+
+/* Etapas */
+
+.etapas {
+  margin-top: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.etapa {
+  background: #fff;
+  border: 1px solid #e2e8e5;
+  border-left: 5px solid #cfd8d4;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.etapa.completa { border-left-color: #2eae60; }
+
+.etapa-cab {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 15px 20px;
+  background: none;
+  border: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+}
+
+.etapa-cab:hover { background: #f7f9f8; }
+.etapa-cab:focus-visible { outline: 2px solid #1b7a43; outline-offset: -2px; }
+
+.etapa-t {
+  font-weight: 700;
+  color: #0e4d2b;
+  font-size: 1rem;
+}
+
+.etapa-r {
+  flex: 1;
+  min-width: 180px;
+  font-size: 0.87rem;
+  color: #6a7a74;
+}
+
+.etapa-n {
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: #eef1f0;
+  color: #56655f;
+  font-variant-numeric: tabular-nums;
+}
+
+.etapa-n.ok { background: #e2f0e6; color: #1b7a43; }
+
+/* Documentos */
+
+.docs {
+  list-style: none;
+  margin: 0;
+  padding: 0 20px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-top: 1px solid #eef1f0;
+}
+
+.docs li {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 11px 0;
+  border-bottom: 1px solid #f2f5f4;
+}
+
+.docs li:last-child { border-bottom: none; }
+
+.doc-estado {
+  flex-shrink: 0;
+  width: 92px;
+  font: inherit;
+  font-size: 0.74rem;
+  font-weight: 700;
+  padding: 5px 0;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  margin-top: 2px;
+}
+
+.docs li.pendiente .doc-estado { background: #f4f0ee; color: #8a6a5f; border-color: #e3d8d3; }
+.docs li.tramite .doc-estado { background: #fbf1dc; color: #8a5d0f; border-color: #ebd6a8; }
+.docs li.listo .doc-estado { background: #e2f0e6; color: #1b7a43; border-color: #b6ddc4; }
+
+.doc-estado:disabled { cursor: default; opacity: 0.95; }
+.doc-estado:not(:disabled):hover { filter: brightness(0.96); }
+.doc-estado:focus-visible { outline: 2px solid #1b7a43; outline-offset: 1px; }
+
+.doc-cuerpo strong {
+  display: block;
+  font-size: 0.93rem;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.doc-cuerpo .auto {
+  display: inline-block;
+  margin-left: 8px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #0e4d2b;
+  background: #d9efe2;
+  padding: 2px 8px;
+  border-radius: 999px;
+  vertical-align: 1px;
+}
+
+.doc-cuerpo p {
+  margin: 0;
+  font-size: 0.86rem;
+  line-height: 1.5;
+  color: #5a6a64;
+  max-width: 74ch;
+}
+
+.doc-cuerpo a { color: #1b7a43; }
+
+.ruta-aviso {
+  margin: 26px 0 0;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  color: #6a7a74;
+  max-width: 78ch;
+}
+
+@media (max-width: 620px) {
+  .ruta { padding: 20px 16px 50px; }
+  .medidor { min-width: 0; width: 100%; }
+  .docs li { flex-direction: column; gap: 6px; }
+  .doc-estado { width: auto; padding: 5px 14px; align-self: flex-start; }
+}

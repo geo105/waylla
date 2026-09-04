@@ -1,0 +1,253 @@
+/* Vista de lotes de exportación */
+
+.lotes {
+  padding: 26px 30px 60px;
+  max-width: 1100px;
+  margin: 0 auto;
+  color: #22333b;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+.lotes-cab {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.lotes h2 {
+  margin: 0 0 6px;
+  font-size: 1.5rem;
+  color: #0e4d2b;
+}
+
+.lotes-sub {
+  margin: 0;
+  max-width: 62ch;
+  color: #4a5a55;
+  line-height: 1.55;
+  font-size: 0.94rem;
+}
+
+/* Formulario de creación */
+
+.form-lote {
+  margin: 22px 0 6px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 14px 16px;
+  background: #fff;
+  border: 1px solid #e2e8e5;
+  border-radius: 14px;
+  padding: 20px;
+}
+
+.form-lote label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #4a5a55;
+}
+
+.form-lote label.ancho {
+  grid-column: 1 / -1;
+}
+
+.form-lote input,
+.form-lote select {
+  font: inherit;
+  font-weight: 400;
+  padding: 9px 11px;
+  border: 1px solid #cfd8d4;
+  border-radius: 8px;
+  background: #fff;
+  color: #22333b;
+}
+
+.form-lote input:focus-visible,
+.form-lote select:focus-visible {
+  outline: 2px solid #1b7a43;
+  outline-offset: 1px;
+}
+
+.form-acciones {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 10px;
+}
+
+/* Lista de lotes */
+
+.vacio {
+  margin: 26px 0;
+  color: #6a7a74;
+}
+
+.vacio.pequeno {
+  margin: 8px 0;
+  font-size: 0.9rem;
+}
+
+.lista-lotes {
+  margin-top: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.lote {
+  background: #fff;
+  border: 1px solid #e2e8e5;
+  border-left: 5px solid #cfd8d4;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.lote.listo { border-left-color: #2eae60; }
+.lote.observado { border-left-color: #e9b44c; }
+.lote.bloqueado { border-left-color: #d64545; }
+
+.lote-cab {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 16px 20px;
+  background: none;
+  border: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+}
+
+.lote-cab:hover { background: #f7f9f8; }
+.lote-cab:focus-visible { outline: 2px solid #1b7a43; outline-offset: -2px; }
+
+.lote-codigo {
+  font-weight: 700;
+  font-size: 1.02rem;
+  color: #0e4d2b;
+}
+
+.lote-meta {
+  flex: 1;
+  min-width: 200px;
+  font-size: 0.88rem;
+  color: #4a5a55;
+}
+
+.estado-lote {
+  font-size: 0.76rem;
+  font-weight: 700;
+  padding: 5px 12px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.estado-lote.listo { background: #e2f0e6; color: #1b7a43; }
+.estado-lote.observado { background: #fbf1dc; color: #9a6a12; }
+.estado-lote.bloqueado { background: #fae7e4; color: #a32b22; }
+.estado-lote.vacio { background: #eef1f0; color: #6a7a74; }
+
+.lote-cuerpo {
+  padding: 4px 20px 20px;
+  border-top: 1px solid #eef1f0;
+}
+
+.aviso {
+  margin: 16px 0;
+  padding: 12px 15px;
+  border-radius: 9px;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.aviso.rojo { background: #fae7e4; color: #8f2419; }
+.aviso.ambar { background: #fbf1dc; color: #8a5d0f; }
+.aviso.verde { background: #e2f0e6; color: #14603a; }
+
+.asignar h3 {
+  margin: 18px 0 8px;
+  font-size: 0.95rem;
+  color: #0e4d2b;
+}
+
+.check-parcelas {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.check-parcelas label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.check-parcelas label:hover { background: #f2f6f4; }
+
+.check-parcelas input {
+  width: 16px;
+  height: 16px;
+  accent-color: #1b7a43;
+  flex-shrink: 0;
+}
+
+.check-parcelas .punto {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.cp-id { font-weight: 700; min-width: 54px; }
+.cp-socio { flex: 1; min-width: 90px; }
+.cp-ha { color: #4a5a55; font-variant-numeric: tabular-nums; }
+
+.cp-estado {
+  font-size: 0.74rem;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 999px;
+  min-width: 62px;
+  text-align: center;
+}
+
+.cp-estado.limpia { background: #e2f0e6; color: #1b7a43; }
+.cp-estado.alerta { background: #fbf1dc; color: #9a6a12; }
+.cp-estado.riesgo { background: #fae7e4; color: #a32b22; }
+
+.lote-acciones {
+  display: flex;
+  gap: 10px;
+  margin-top: 18px;
+  flex-wrap: wrap;
+}
+
+.btn.peligro {
+  border-color: #e3b7b1;
+  color: #a32b22;
+}
+
+.btn.peligro:hover {
+  background: #fae7e4;
+}
+
+@media (max-width: 620px) {
+  .lotes { padding: 20px 16px 50px; }
+  .cp-ha { display: none; }
+}

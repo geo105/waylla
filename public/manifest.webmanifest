@@ -1,0 +1,20 @@
+{
+  "name": "Waylla Campo Offline",
+  "short_name": "Waylla",
+  "description": "Captura preliminar de parcelas para trazabilidad EUDR, usable sin conexión.",
+  "lang": "es-PE",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f2f4f3",
+  "theme_color": "#0e4d2b",
+  "icons": [
+    {
+      "src": "./favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

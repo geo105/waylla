@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Waylla Campo</string>
+    <string name="title_activity_main">Waylla Campo</string>
+    <string name="package_name">pe.waylla.campo</string>
+    <string name="custom_url_scheme">pe.waylla.campo</string>
+</resources>

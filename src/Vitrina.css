@@ -1,0 +1,252 @@
+/* Vitrina de origen verificado */
+
+.vitrina {
+  padding: 26px 30px 60px;
+  max-width: 1100px;
+  margin: 0 auto;
+  color: #22333b;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+.vit-cab {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.vitrina h2 {
+  margin: 0 0 6px;
+  font-size: 1.5rem;
+  color: #0e4d2b;
+}
+
+.vit-sub {
+  margin: 0;
+  max-width: 62ch;
+  color: #4a5a55;
+  line-height: 1.55;
+  font-size: 0.94rem;
+}
+
+/* Formulario de la ficha */
+
+.vit-form {
+  margin-top: 22px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 14px 16px;
+  background: #fff;
+  border: 1px solid #e2e8e5;
+  border-radius: 14px;
+  padding: 20px;
+}
+
+.vit-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #4a5a55;
+}
+
+.vit-form label.ancho { grid-column: 1 / -1; }
+
+.vit-form input,
+.vit-form textarea {
+  font: inherit;
+  font-weight: 400;
+  padding: 9px 11px;
+  border: 1px solid #cfd8d4;
+  border-radius: 8px;
+  resize: vertical;
+}
+
+.vit-form input:focus-visible,
+.vit-form textarea:focus-visible {
+  outline: 2px solid #1b7a43;
+  outline-offset: 1px;
+}
+
+.vit-form button { grid-column: 1 / -1; justify-self: start; }
+
+/* La ficha */
+
+.ficha {
+  margin-top: 22px;
+  background: #fff;
+  border: 1px solid #e2e8e5;
+  border-top: 5px solid #cfd8d4;
+  border-radius: 14px;
+  padding: 26px 28px;
+}
+
+.ficha.sellada { border-top-color: #2eae60; }
+
+.ficha-cab {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.ficha h3 {
+  margin: 0;
+  font-size: 1.3rem;
+  color: #0e4d2b;
+}
+
+.ficha-alt {
+  margin: 4px 0 0;
+  color: #6a7a74;
+  font-size: 0.9rem;
+}
+
+.sello-origen {
+  flex-shrink: 0;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 8px 15px;
+  border-radius: 8px;
+  border: 2px solid;
+}
+
+.sello-origen.ok { color: #1b7a43; border-color: #2eae60; background: #f0f8f3; }
+.sello-origen.no { color: #8a5d0f; border-color: #d9a53c; background: #fdf8ee; }
+
+.ficha-desc {
+  margin: 16px 0 0;
+  line-height: 1.6;
+  color: #4a5a55;
+  max-width: 72ch;
+}
+
+.ficha-datos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 18px 22px;
+  margin: 22px 0 0;
+  padding: 20px 0;
+  border-top: 1px solid #eef1f0;
+  border-bottom: 1px solid #eef1f0;
+}
+
+.ficha-datos div { display: flex; flex-direction: column; gap: 3px; }
+
+.ficha-datos span {
+  font-size: 0.73rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #7b8a85;
+  font-weight: 600;
+}
+
+.ficha-datos strong {
+  font-size: 1.08rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.ficha-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.tag {
+  font-size: 0.8rem;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: #eef1f0;
+  color: #4a5a55;
+}
+
+.tag.cert { background: #e2f0e6; color: #1b7a43; font-weight: 600; }
+
+.ficha-pie { margin-top: 18px; }
+
+.ficha-pie p {
+  margin: 0 0 6px;
+  font-size: 0.85rem;
+  line-height: 1.55;
+  color: #6a7a74;
+  max-width: 74ch;
+}
+
+.ficha-contacto { color: #4a5a55; font-weight: 600; }
+
+/* Red de organizaciones */
+
+.red { margin-top: 40px; }
+
+.red h3 {
+  margin: 0 0 6px;
+  font-size: 1.15rem;
+  color: #0e4d2b;
+}
+
+.red-sub {
+  margin: 0 0 18px;
+  max-width: 66ch;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: #6a7a74;
+}
+
+.red-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 10px;
+}
+
+.red-lista li {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  background: #fff;
+  border: 1px solid #e2e8e5;
+  border-radius: 12px;
+  padding: 16px 18px;
+}
+
+.red-lista strong { display: block; font-size: 0.95rem; }
+
+.red-lista small {
+  display: block;
+  margin: 2px 0 6px;
+  color: #7b8a85;
+  font-size: 0.82rem;
+}
+
+.red-lista p {
+  margin: 0;
+  font-size: 0.86rem;
+  line-height: 1.45;
+  color: #5a6a64;
+}
+
+.estado-red {
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #eef3f6;
+  color: #4a6270;
+}
+
+@media (max-width: 620px) {
+  .vitrina { padding: 20px 16px 50px; }
+  .ficha { padding: 20px 18px; }
+}

@@ -7,6 +7,7 @@
   --tinta: #22333b;
   --gris: #f2f4f3;
   min-height: 100vh;
+  min-height: 100svh;
   background: var(--gris);
   color: var(--tinta);
   font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
@@ -17,7 +18,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 6vw;
+  padding: max(14px, env(safe-area-inset-top)) 6vw 14px;
   background: var(--verde-oscuro);
   color: #fff;
 }
@@ -203,7 +204,7 @@
 .l-req p { margin: 0; font-size: 0.88rem; line-height: 1.5; color: #4a5a55; }
 
 .l-footer {
-  padding: 24px 6vw;
+  padding: 24px 6vw max(24px, env(safe-area-inset-bottom));
   text-align: center;
   font-size: 0.8rem;
   color: #5b6b66;

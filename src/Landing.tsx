@@ -10,7 +10,7 @@ export default function Landing({ onComenzar }: { onComenzar: () => void }) {
       n: 1,
       titulo: 'Ubícate en el mapa',
       texto:
-        'Abre el mapa satelital y navega hasta la zona de tu cooperativa. Verás encima la capa real de pérdida de bosque de Global Forest Watch.',
+        'Elige una zona guardada. Si hay señal verás el mapa satelital; sin señal podrás continuar con el fondo y las referencias incluidas.',
     },
     {
       n: 2,
@@ -22,13 +22,19 @@ export default function Landing({ onComenzar }: { onComenzar: () => void }) {
       n: 3,
       titulo: 'Verifica la deforestación',
       texto:
-        'Al instante ves una alerta preliminar (modo offline). Con el botón "Verificar", el sistema lee los datos satelitales reales y confirma el veredicto: limpia, alerta o riesgo.',
+        'Sin señal obtienes una alerta preliminar al instante. Con conexión, Waylla contrasta la parcela contra la capa real de pérdida de bosque de Global Forest Watch y confirma el veredicto.',
     },
     {
       n: 4,
-      titulo: 'Exporta el expediente',
+      titulo: 'Arma el lote y emite el expediente',
       texto:
-        'Descarga el GeoJSON con la precisión de 6 decimales que exige el reglamento europeo EUDR, listo para entregárselo al comprador.',
+        'Agrupa las parcelas de varios socios en el lote que se embarca. Si una sola tiene pérdida de bosque, el sistema detiene el lote y te dice cuál. Si está limpio, genera el expediente con las coordenadas a seis decimales para el comprador.',
+    },
+    {
+      n: 5,
+      titulo: 'Completa la ruta y publica tu ficha',
+      texto:
+        'Ese expediente es uno de los veintidós documentos que exige una exportación. Waylla ordena los demás, marca cuáles faltan y quién los emite, y publica una ficha con tu origen verificado para que los compradores te encuentren.',
     },
   ]
 
@@ -54,9 +60,9 @@ export default function Landing({ onComenzar }: { onComenzar: () => void }) {
             sus parcelas, verificarlas contra datos satelitales y generar el expediente que exige la norma.
           </p>
           <button className="l-cta" onClick={onComenzar}>
-            Comenzar →
+            Abrir Waylla Campo →
           </button>
-          <p className="l-nota">No necesitas instalar nada. Funciona en tu navegador.</p>
+          <p className="l-nota">Aplicación instalable · guarda las parcelas en este dispositivo · funciona sin servidor</p>
         </div>
         <div className="l-hero-art">
           <Arte />
@@ -127,8 +133,8 @@ export default function Landing({ onComenzar }: { onComenzar: () => void }) {
         <div className="l-modo">
           <h3><IconoReq tipo="offline" size={24} /> Modo offline</h3>
           <p>
-            En el campo, sin señal, el técnico obtiene una alerta preliminar al instante. La captura
-            de la parcela nunca se detiene por falta de internet.
+            En el campo, sin señal, el técnico captura, guarda y exporta parcelas. Los registros
+            permanecen en el teléfono al cerrar y volver a abrir la aplicación.
           </p>
         </div>
         <div className="l-modo">
